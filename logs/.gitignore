@@ -2,4 +2,5 @@
 # Copyright © 2019 The developers of reproducible-macports. See the COPYRIGHT file in the top-level directory of this distribution and at https://raw.githubusercontent.com/raphaelcohn/reproducible-macports/master/COPYRIGHT.
 
 
-prefix/
+reproducible-port.install.log
+reproducible-port.portindex.log
