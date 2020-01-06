@@ -126,43 +126,27 @@ depends()
 	done
 }
 
-reproducible_macports_portIndex()
-{
-	local portIndexFilePath="$(pwd)"/prefix/bin/portindex
-	
-	local portsRepository
-	for portsRepository in local-ports macports-ports
-	do
-		local folderPath="$(pwd)"/reproducible-macports.conf/macports-ports
-		if [ -d "$folderPath" ]; then
-			environment_cd reproducible-macports.conf/macports-ports
-				"$portIndexFilePath"
-			environment_cdBack
-		fi
-	done
-}
-
-depends uname
-reproducible_macports_main()
+depends dirname mkdir ln git
+install_reproducible_macports()
 {
 	cd "$(_program_path_find)" 1>/dev/null 2>/dev/null
 	
 	local functions="$(pwd)"/functions
 	. "$functions"/environment.functions
 	
-	if [ "$(uname)" != 'Darwin' ]; then
+	local container="$(pwd)"/reproducible-macports.conf
+	
+	if [ -d "$container" ]; then
 		return 0
 	fi
 	
-	. "$functions"/macos.functions
-
-	reproducible_macports_setVariables
+	mkdir -m 0700 -p "$container"
+	mkdir -m 0700 -p "$container"/cache
+	ln -s ../../"$parentFolderName"/prefix "$container"/root
+	#git -C "$parent" add --all "$container"
+	#git -C "$container" submodule add --depth=1 https://github.com/macports/macports-ports macports-ports
 	
-	reproducible_macports_install 2>"$(pwd)"/reproducible-macports.install.log 1>&2
-	
-	reproducible_macports_portIndex 2>"$(pwd)"/reproducible-macports.portindex.log 1>&2
-	
-	PATH="$reproducible_macports_prefixFolderPath"/bin:"$reproducible_macports_prefixFolderPath"/sbin:"$PATH" exec port -t "$@"
+	#"$(pwd)"/reproducible-macports
 }
 
-reproducible_macports_main "$@"
+install_reproducible_macports "$@"

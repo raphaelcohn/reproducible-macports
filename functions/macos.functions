@@ -1,0 +1,201 @@
+# This file is part of reproducible-macports. It is subject to the licence terms in the COPYRIGHT file found in the top-level directory of this distribution and at https://raw.githubusercontent.com/raphaelcohn/reproducible-macports/master/COPYRIGHT. No part of reproducible-macports, including this file, may be copied, modified, propagated, or distributed except according to the terms contained in the COPYRIGHT file.
+# Copyright © 2019 The developers of reproducible-macports. See the COPYRIGHT file in the top-level directory of this distribution and at https://raw.githubusercontent.com/raphaelcohn/reproducible-macports/master/COPYRIGHT.
+
+
+depends sysctl
+reproducible_macports_supportOfficiallyUnsupportedMacs()
+{
+	local model="$(sysctl -b hw.model)"
+	
+	case "$model" in
+		
+		'MacBookPro5,2')
+			# -mmacosx-version-min=10.9
+			export MACOSX_DEPLOYMENT_TARGET='10.9'
+		;;
+		
+	esac
+}
+
+reproducible_macports_setVariables()
+{
+	reproducible_macports_sourceFolderPath="$(pwd)"/source/macports-base
+	reproducible_macports_prefixFolderPath="$(pwd)"/prefix
+	
+	reproducible_macports_currentMacportsVersion="$(git -C "$reproducible_macports_sourceFolderPath" log --pretty=format:%H -n 1)"
+	
+	reproducible_macports_installedMacportsVersionFile="$reproducible_macports_prefixFolderPath"/.macports.version
+	
+	reproducible_macports_defaultPath=/usr/bin:/bin:/usr/sbin:/sbin
+	
+	reproducible_macports_supportOfficiallyUnsupportedMacs
+}
+
+depends xcode-select
+reproducible_macports_installXcodeCommandLineTools()
+{
+	set +e
+		xcode-select --install 2>/dev/null
+	set -e
+}
+
+depends git head
+reproducible_macports_shouldInstall()
+{
+	shouldInstall=true
+	if [ -f "$reproducible_macports_installedMacportsVersionFile" ]; then
+		if [ -r "$reproducible_macports_installedMacportsVersionFile" ]; then
+			local installedVersion="$(head -n 1 $reproducible_macports_installedMacportsVersionFile)"
+			if [ "$installedVersion" = "$reproducible_macports_currentMacportsVersion" ]; then
+				shouldInstall=false
+			fi
+		fi
+	fi
+}
+
+depends rm mkdir
+reproducible_macports_clean()
+{
+	if $shouldInstall; then
+		rm -rf "$reproducible_macports_prefixFolderPath"
+		mkdir -m 0700 -p "$reproducible_macports_prefixFolderPath"
+	fi
+}
+
+depends id env make rm cat
+reproducible_macports_compile()
+{
+	local archiveType='tbz2'
+	local configurationFolderPath="$reproducible_macports_prefixFolderPath"/etc/macports
+	local applicationsFolderPath="$reproducible_macports_prefixFolderPath"/Applications
+	local frameworksFolderPath="$reproducible_macports_prefixFolderPath"/Library/Frameworks
+	
+	environment_gitClean "$reproducible_macports_sourceFolderPath"
+	environment_cd "$reproducible_macports_sourceFolderPath"
+
+		local user="$(id -u -n)"
+		local group="$(id -g -n)"
+		
+		env -i PATH="$reproducible_macports_defaultPath" ./configure \
+			--enable-readline \
+			--prefix="$reproducible_macports_prefixFolderPath" \
+			--without-startupitems \
+			--with-unsupported-prefix \
+			--with-no-root-privileges \
+			--with-install-user="$user" \
+			--with-install-group="$group" \
+			--with-macports-user="$user" \
+			--with-directory-mode=0700 \
+			--with-applications-dir="$applicationsFolderPath"
+		env -i PATH="$reproducible_macports_defaultPath" make
+		set +e
+			# Bug in use of `cut`, it seems.
+			env -i PATH="$reproducible_macports_defaultPath" make install
+		set -e
+	
+	environment_cdBack
+	environment_gitClean "$reproducible_macports_sourceFolderPath"
+	
+	cat >"$configurationFolderPath"/archive_sites.conf <<-EOF
+		name macports_archives
+		
+		name Empty
+		urls 
+		type ${archiveType}
+		prefix ${reproducible_macports_prefixFolderPath}
+		applications_dir ${applicationsFolderPath}
+		frameworks_dir ${frameworksFolderPath}
+		cxx_stdlib libc++
+		delete_la_files yes
+	EOF
+	
+	cat >"$configurationFolderPath"/macports.conf <<-EOF
+		prefix ${reproducible_macports_prefixFolderPath}
+		macportsuser ${user}
+		portdbpath ${reproducible_macports_prefixFolderPath}/var/macports
+		binpath ${reproducible_macports_prefixFolderPath}/bin:${reproducible_macports_prefixFolderPath}/sbin:${reproducible_macports_defaultPath}
+		developer_dir /Library/Developer/CommandLineTools
+		packagemaker_path /Applications/PackageMaker.app
+		applications_dir ${applicationsFolderPath}
+		frameworks_dir ${frameworksFolderPath}
+		sources_conf ${configurationFolderPath}/sources.conf
+		variants_conf ${configurationFolderPath}/variants.conf
+		buildfromsource always
+		portarchivetype ${archiveType}
+		hfscompression yes
+		build_arch x86_64
+		universal_archs x86_64
+		configureccache no
+		ccache_dir ${reproducible_macports_prefixFolderPath}/var/macports/build/.ccache
+		ccache_size 2G
+		configuredistcc no
+		configurepipe yes
+		buildnicevalue 0
+		buildmakejobs 0
+		destroot_umask 022
+		portautoclean yes
+		keeplogs no
+		rsync_server example.org
+		rsync_dir macports/release/tarballs/base.tar
+		rsync_options -rtzvl --delete-after
+		startupitem_type none
+		startupitem_install	no
+		startupitem_autostart no
+
+		# Extra environment variables to keep. MacPorts sanitizes its environment while processing ports, keeping:
+		# - DISPLAY
+		# - DYLD_FALLBACK_FRAMEWORK_PATH, DYLD_FALLBACK_LIBRARY_PATH,
+		#   DYLD_FRAMEWORK_PATH, DYLD_INSERT_LIBRARIES, DYLD_LIBRARY_PATH
+		# - JAVA_HOME
+		# - ARCHIVE_SITE_LOCAL, MASTER_SITE_LOCAL, PATCH_SITE_LOCAL
+		# - PORTSRC
+		# - ALL_PROXY, FTP_PROXY, http_proxy, HTTPS_PROXY, NO_PROXY, RSYNC_PROXY
+		# - GROUP, USER
+		# - COLUMNS, LINES
+		extra_env MACOSX_DEPLOYMENT_TARGET
+		
+		#proxy_override_env no
+		#proxy_http proxy1:12345
+		#proxy_https proxy2:67890
+		#proxy_ftp proxy3:02139
+		#proxy_rsync proxy4:11377
+		#proxy_skip  host1, host2, host3
+		#host_blacklist badhost1 badhost2
+		#preferred_hosts preferredhost1 preferredhost2 *.de.*.macports.org
+		
+		revupgrade_autorun no
+		revupgrade_mode report
+
+		#pkg_post_unarchive_deletions	include share/doc share/man
+		
+		ui_interactive no
+	EOF
+	if [ -n ${MACOSX_DEPLOYMENT_TARGET+isset} ]; then
+		printf 'macosx_deployment_target %s\n' "$MACOSX_DEPLOYMENT_TARGET" >>"$configurationFolderPath"/macports.conf
+	fi
+	
+	local reproducible_macports_portsFolderPath="$(pwd)"/ports
+	
+	cat >"$configurationFolderPath"/sources.conf <<-EOF
+		file:///${reproducible_macports_portsFolderPath} [default]
+	EOF
+	
+	cat >"$configurationFolderPath"/pubkeys.conf <<-EOF
+		${reproducible_macports_prefixFolderPath}/share/macports/macports-pubkey.pem
+	EOF
+	
+	printf '' >"$configurationFolderPath"/variants.conf
+	
+	printf '%s\n' "$reproducible_macports_currentMacportsVersion" >"$reproducible_macports_installedMacportsVersionFile"
+}
+
+reproducible_macports_install()
+{
+	local shouldInstall
+	reproducible_macports_shouldInstall
+	if $shouldInstall; then
+		reproducible_macports_installXcodeCommandLineTools
+		reproducible_macports_clean
+		reproducible_macports_compile
+	fi
+}

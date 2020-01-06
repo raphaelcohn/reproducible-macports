@@ -2,6 +2,21 @@
 # Copyright © 2019 The developers of reproducible-macports. See the COPYRIGHT file in the top-level directory of this distribution and at https://raw.githubusercontent.com/raphaelcohn/reproducible-macports/master/COPYRIGHT.
 
 
-prefix/
-reproducible-macports.install.log
-reproducible-macports.portindex.log
+environment_cd()
+{
+	local folderPath="$1"
+	cd "$folderPath" 1>/dev/null 2>/dev/null
+}
+
+environment_cdBack()
+{
+	cd - 1>/dev/null 2>/dev/null
+}
+
+depends git
+environment_gitClean()
+{
+	local folderPath="$1"
+	
+	git -C "$folderPath" clean --quiet --force -d -x
+}
