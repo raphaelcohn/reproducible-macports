@@ -167,11 +167,6 @@ install_reproducible_macports()
 			EOF
 			git add local-ports/.gitignore
 		fi
-
-		if [ ! -e cache ]; then
-			ln -s ../"$ourFolderName"/var/macports/distfiles cache
-			git add cache
-		fi
 	
 		if [ ! -e macports-ports ]; then
 			ln -s ../"$ourFolderName"/source/macports-ports macports-ports
@@ -181,6 +176,11 @@ install_reproducible_macports()
 		if [ ! -e root ]; then
 			ln -s ../"$ourFolderName"/prefix root
 			git add root
+		fi
+
+		if [ ! -e cache ]; then
+			ln -s root/var/macports/distfiles cache
+			git add cache
 		fi
 		
 	environment_cdBack
