@@ -126,7 +126,7 @@ depends()
 	done
 }
 
-depends dirname mkdir ln git
+depends git mkdir cat dirname ln
 install_reproducible_macports()
 {
 	cd "$(_program_path_find)" 1>/dev/null 2>/dev/null
@@ -141,12 +141,54 @@ install_reproducible_macports()
 	fi
 	
 	mkdir -m 0700 -p "$container"
-	mkdir -m 0700 -p "$container"/cache
-	ln -s ../../"$parentFolderName"/prefix "$container"/root
-	#git -C "$parent" add --all "$container"
-	#git -C "$container" submodule add --depth=1 https://github.com/macports/macports-ports macports-ports
 	
-	#"$(pwd)"/reproducible-macports
+	environment_cd "$container"
+		
+		set +e
+			local isInGit="$(git rev-parse --is-inside-work-tree 2>/dev/null)"
+		set -e
+		case "$isInGit" in
+		
+			true)
+				:
+			;;
+		
+			false)
+				fail 1 "Is inside a .git tree"
+			;;
+		
+			'')
+				git init --quiet
+			;;
+		esac
+
+		if [ ! -e cache ]; then
+			mkdir -m 0700 -p /cache
+			git add /cache
+		fi
+
+		if [ ! -e local-ports/.gitignore ]; then
+			mkdir -m 0700 -p local-ports
+			cat >local-ports/.gitignore <<-EOF
+				PortIndex
+				PortIndex.quick
+			EOF
+			git add local-ports/.gitignore
+		fi
+	
+		local ourFolderName="$(dirname "$(pwd)")"
+	
+		if [ ! -e macports-ports ]; then
+			ln -s ../"$ourFolderName"/source/macports-ports
+			git add macports-ports
+		fi
+
+		if [ ! -e root ]; then
+			ln -s ../"$ourFolderName"/prefix root
+			git add root
+		fi
+		
+	environment_cdBack
 }
 
 install_reproducible_macports "$@"
