@@ -126,7 +126,7 @@ depends()
 	done
 }
 
-depends git mkdir cat dirname ln
+depends basename git mkdir cat ln
 install_reproducible_macports()
 {
 	cd "$(_program_path_find)" 1>/dev/null 2>/dev/null
@@ -134,11 +134,8 @@ install_reproducible_macports()
 	local functions="$(pwd)"/functions
 	. "$functions"/environment.functions
 	
-	local container="$(pwd)"/reproducible-macports.conf
-	
-	if [ -d "$container" ]; then
-		return 0
-	fi
+	local container="$(pwd)"/../reproducible-macports.conf
+	local ourFolderName="$(basename "$(pwd)")"
 	
 	mkdir -m 0700 -p "$container"
 	
@@ -162,9 +159,11 @@ install_reproducible_macports()
 			;;
 		esac
 
-		if [ ! -e cache ]; then
-			mkdir -m 0700 -p /cache
-			git add /cache
+		if [ ! -e cache/.gitignore ]; then
+			mkdir -m 0700 -p cache
+			cat >cache/.gitignore <<-EOF
+			EOF
+			git add cache/.gitignore
 		fi
 
 		if [ ! -e local-ports/.gitignore ]; then
@@ -176,10 +175,8 @@ install_reproducible_macports()
 			git add local-ports/.gitignore
 		fi
 	
-		local ourFolderName="$(dirname "$(pwd)")"
-	
 		if [ ! -e macports-ports ]; then
-			ln -s ../"$ourFolderName"/source/macports-ports
+			ln -s ../"$ourFolderName"/source/macports-ports macports-ports
 			git add macports-ports
 		fi
 

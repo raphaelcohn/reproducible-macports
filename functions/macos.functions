@@ -174,10 +174,10 @@ reproducible_macports_compile()
 		printf 'macosx_deployment_target %s\n' "$MACOSX_DEPLOYMENT_TARGET" >>"$configurationFolderPath"/macports.conf
 	fi
 	
-	local reproducible_macports_portsFolderPath="$(pwd)"/ports
-	
+	local nonGitConfigurationFolderPath="$(pwd)"/reproducible-macports.conf
 	cat >"$configurationFolderPath"/sources.conf <<-EOF
-		file:///${reproducible_macports_portsFolderPath} [default]
+		file:///${nonGitConfigurationFolderPath}/local-ports
+		file:///${nonGitConfigurationFolderPath}/macports-ports [default]
 	EOF
 	
 	cat >"$configurationFolderPath"/pubkeys.conf <<-EOF
