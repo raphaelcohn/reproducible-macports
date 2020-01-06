@@ -1,0 +1,3 @@
+[submodule "source/macports-base"]
+	path = source/macports-base
+	url = https://github.com/macports/macports-base.git
