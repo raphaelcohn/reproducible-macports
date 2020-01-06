@@ -186,6 +186,8 @@ reproducible_macports_compile()
 	
 	printf '' >"$configurationFolderPath"/variants.conf
 	
+	mkdir -m 0700 -p "$reproducible_macports_prefixFolderPath"/var/macports/distfiles
+	
 	printf '%s\n' "$reproducible_macports_currentMacportsVersion" >"$reproducible_macports_installedMacportsVersionFile"
 }
 

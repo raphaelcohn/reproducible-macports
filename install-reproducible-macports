@@ -159,13 +159,6 @@ install_reproducible_macports()
 			;;
 		esac
 
-		if [ ! -e cache/.gitignore ]; then
-			mkdir -m 0700 -p cache
-			cat >cache/.gitignore <<-EOF
-			EOF
-			git add cache/.gitignore
-		fi
-
 		if [ ! -e local-ports/.gitignore ]; then
 			mkdir -m 0700 -p local-ports
 			cat >local-ports/.gitignore <<-EOF
@@ -173,6 +166,11 @@ install_reproducible_macports()
 				PortIndex.quick
 			EOF
 			git add local-ports/.gitignore
+		fi
+
+		if [ ! -e cache ]; then
+			ln -s ../"$ourFolderName"/var/macports/distfiles cache
+			git add cache
 		fi
 	
 		if [ ! -e macports-ports ]; then
