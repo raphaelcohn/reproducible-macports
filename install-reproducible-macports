@@ -162,8 +162,9 @@ install_reproducible_macports()
 		if [ ! -e local-ports/.gitignore ]; then
 			mkdir -m 0700 -p local-ports
 			cat >local-ports/.gitignore <<-EOF
-				PortIndex
-				PortIndex.quick
+				/PortIndex
+				/PortIndex.quick
+				/*/*/work
 			EOF
 			git add local-ports/.gitignore
 		fi
