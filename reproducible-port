@@ -162,7 +162,7 @@ reproducible_macports_main()
 	
 	reproducible_macports_portIndex 2>"$(pwd)"/logs/reproducible-port.portindex.log 1>&2
 	
-	PATH="$reproducible_macports_prefixFolderPath"/bin:"$reproducible_macports_prefixFolderPath"/sbin:"$PATH" exec port -t "$@"
+	PATH="$reproducible_macports_prefixFolderPath"/bin:"$reproducible_macports_prefixFolderPath"/sbin:"$PATH" exec port "$@"
 }
 
 reproducible_macports_main "$@"
