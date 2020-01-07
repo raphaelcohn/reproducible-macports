@@ -179,9 +179,10 @@ install_reproducible_macports()
 			git add root
 		fi
 
-		if [ ! -e cache ]; then
-			ln -s root/var/macports/distfiles cache
-			git add cache
+		if [ ! -e distfiles/.gitignore ]; then
+			mkdir -m 0700 -p distfiles
+			printf '' >distfiles/.gitignore
+			git add distfiles/.gitignore
 		fi
 		
 	environment_cdBack
