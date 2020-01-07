@@ -133,9 +133,9 @@ reproducible_macports_portIndex()
 	local portsRepository
 	for portsRepository in local-ports macports-ports
 	do
-		local folderPath="$(pwd)"/reproducible-macports.conf/macports-ports
+		local folderPath="$(pwd)"/reproducible-macports.conf/"$portsRepository"
 		if [ -d "$folderPath" ]; then
-			environment_cd reproducible-macports.conf/macports-ports
+			environment_cd "$folderPath"
 				"$portIndexFilePath"
 			environment_cdBack
 		fi

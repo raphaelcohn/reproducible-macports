@@ -10,7 +10,6 @@ reproducible_macports_supportOfficiallyUnsupportedMacs()
 	case "$model" in
 		
 		'MacBookPro5,2')
-			# -mmacosx-version-min=10.9
 			export MACOSX_DEPLOYMENT_TARGET='10.9'
 		;;
 		
