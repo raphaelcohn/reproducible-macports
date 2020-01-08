@@ -185,6 +185,11 @@ install_reproducible_macports()
 			git add distfiles/.gitignore
 		fi
 		
+		if [ -! PortList ]; then
+			printf '\n' >PortList
+			git add PortList
+		fi
+		
 	environment_cdBack
 }
 

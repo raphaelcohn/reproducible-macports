@@ -7,7 +7,7 @@ set -e
 set -u
 set -f
 
-program_name="reproducible-port"
+program_name="reproducible-port-list"
 
 _program_path_find()
 {
@@ -126,24 +126,68 @@ depends()
 	done
 }
 
-reproducible_macports_portIndex()
+reproducible_port_list_uninstallLeaves()
 {
-	local portIndexFilePath="$(pwd)"/prefix/bin/portindex
+	set +e
+		./reproducible-port uninstall --follow-dependencies --follow-dependents inactive 2>/dev/null
+		
+		local exitCode=1
+		while [ $exitCode -eq 0 ]
+		do
+			./reproducible-port uninstall --follow-dependencies --follow-dependents leaves 2>/dev/null
+			exitCode=$?
+		done
+	set -e
+}
+
+depends diff tail cat rm cp
+reproducible_port_list_update()
+{
+	local userPortsListFilePath="$(pwd)"/reproducible-macports.conf/PortList
+	local cachedPortsListFilePath="$reproducible_macports_prefixFolderPath"/.PortList
 	
-	local portsRepository
-	for portsRepository in local-ports macports-ports
-	do
-		local folderPath="$(pwd)"/reproducible-macports.conf/"$portsRepository"
-		if [ -d "$folderPath" ]; then
-			environment_cd "$folderPath"
-				"$portIndexFilePath"
-			environment_cdBack
+	if [ -f "$userPortsListFilePath" ]; then
+		if [ -r "$userPortsListFilePath" ]; then
+			if [ -f "$cachedPortsListFilePath" ]; then
+				if [ -r "$cachedPortsListFilePath" ]; then
+					if diff -q "$userPortsListFilePath" "$cachedPortsListFilePath" 1>/dev/null; then
+						return 0
+					fi
+				fi
+			fi
 		fi
-	done
+	fi
+
+	local portName
+	if [ -f "$cachedPortsListFilePath" ]; then
+		if [ -r "$cachedPortsListFilePath" ]; then
+			# NOTE: macos sed adds a trailing line, so input does not need to end with a line feed.
+			tail -r "$cachedPortsListFilePath" | tr -d '[:blank:]' | sed -e '/^#/d' -e '/^$/d' | while IFS= read -r portName
+			do
+				./reproducible-port uninstall --follow-dependencies --follow-dependents "$portName"
+				./reproducible-port clean --archive --logs --work "$portName"
+			done
+		fi
+	fi
+	rm -rf "$cachedPortsListFilePath"
+	
+	# NOTE: macos sed adds a trailing line, so input does not need to end with a line feed.
+	if [ -f "$userPortsListFilePath" ]; then
+		if [ -r "$userPortsListFilePath" ]; then
+			cat "$userPortsListFilePath" | tr -d '[:blank:]' | sed -e '/^#/d' -e '/^$/d' | while IFS= read -r portName
+			do
+				./reproducible-port clean --archive --logs --work "$portName"
+				./reproducible-port install "$portName"
+			done
+			cp "$userPortsListFilePath" "$cachedPortsListFilePath"
+		fi
+	fi
+	
+	reproducible_port_list_uninstallLeaves
 }
 
 depends uname
-reproducible_macports_main()
+reproducible_port_list_main()
 {
 	cd "$(_program_path_find)" 1>/dev/null 2>/dev/null
 	
@@ -158,13 +202,7 @@ reproducible_macports_main()
 
 	reproducible_macports_setVariables
 	
-	reproducible_macports_install 2>"$(pwd)"/logs/reproducible-port.install.log 1>&2
-	
-	if $reproducible_macports_index; then
-		reproducible_macports_portIndex 2>"$(pwd)"/logs/reproducible-port.portindex.log 1>&2
-	fi
-	
-	PATH="$reproducible_macports_prefixFolderPath"/bin:"$reproducible_macports_prefixFolderPath"/sbin:"$PATH" exec port "$@"
+	reproducible_port_list_update
 }
 
-reproducible_macports_main "$@"
+reproducible_port_list_main "$@"

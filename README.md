@@ -1,6 +1,6 @@
 # reproducible-macports
 
-This simple wrapper makes [MacPorts](https://www.macports.org/) reproducible and suitable for use as part of a wider git tree, so all your builds are tied to specific, versioned portfiles and distfiles.
+This simple wrapper makes [MacPorts](https://www.macports.org/) reproducible and suitable for use as part of a wider git tree, so all your builds are tied to specific, versioned portfiles and distfiles. This project arose because it was too hard to do this with homebrew (especially because homebrew ties recipe syntax too tightly to the version of Ruby and homebrew).
 
 To use, it, first add it to an existing git repository as a submodule, eg
 
@@ -28,7 +28,88 @@ The first time `reproducible-port` is run it compiles [MacPorts](https://www.mac
 
 Installed binaries and libraries can be found in `reproducible-macports.conf/root`.
 
-A cache of downloaded distfiles (downloaded archives for versions) can be found in `reproducible-macports.conf/distfiles`; by default, this is set up to be committed to git, so allowing one to capture internet originating files for source code that might disappear or be unavailable during a build.
+A cache of downloaded distfiles (downloaded archives for versions) can be found in `reproducible-macports.conf/distfiles`; by default, this is set up to be committed to git, so allowing one to capture internet originating files for source code that might disappear or be unavailable during a build. An empty `.gitignore` file is in this folder. Simply edit to contain `/*/` to not commit any distfiles to git.
+
+
+## Quick Uses
+
+
+### Getting out of a mess
+
+If you get into a mess, just delete `reproducible-macports/prefix`, eg `rm -rf reproducible-macports/prefix`.
+
+
+### Adding binaries to the path as part of a build
+
+At the beginning of a build script, say `build` in `my-git-repository`, add:-
+
+```bash
+#!/usr/bin/env sh
+
+set -e
+set -f
+set -u
+
+use_reproducible_ports()
+{
+	local reproducible_port=./reproducible-port.conf/reproducible-port
+	
+	set +e
+		"$reproducible_port" uninstall inactive 2>/dev/null
+		local exitCode=1
+		while [ $exitCode -eq 1 ]
+		do
+			"$reproducible_port" uninstall --follow-dependencies --follow-dependents leaves 2>/dev/null
+			exitCode=$?
+		done
+	set -e
+	
+	local portName
+	for portName in "$@"
+	do
+		"$reproducible_port" clean --archive --logs --work "$portName"
+		"$reproducible_port" install --no-rev-upgrade "$portName"
+	done
+	
+	# Run in case local-ports or macports-ports have changed.
+	"$reproducible_port" upgrade outdated
+	
+	export PATH="$(pwd)"/reproducible-macports.conf/root/bin:"$(pwd)"/reproducible-macports.conf/root/sbin:/usr/bin:/usr/bin:/bin:/sbin
+}
+
+#¹
+
+use_reproducible_ports wget bzip2
+
+# Now saying wget or bunzip will use the binary installed as a reproducible port; all other binaries will be those shipped with macos.
+```
+
+¹As an aside, if you want a location independent build script, copy the function `_program_path_find` from `reproducible-port` and then do `cd "$(_program_path_find)" 1>/dev/null 2>/dev/null`; this will set the current working directory (`CWD`) to the absolute folder path containing your build script.
+
+
+
+## Advanced Uses
+
+
+### Automatically maintaining compiled and installed ports
+
+A frequent use case for reproducible-port is to install a build-local set of known, good binaries and libraries which are rebuilt or reinstalled when the list as a whole changes. This can be simply done using `reproducible-port-list`. Firstly, edit the file, `reproducible-macports.conf/PortList`. Add a list of ports, one per line. For example:-
+
+```
+wget
+bzip2
+```
+
+(Make sure the final line ends with a line feed; comments starting a line with # and empty lines are allowed but are treated as changes if they change).
+
+Now, as part of your build script (such as `my-git-repository/build`), add lines equivalent to:-
+
+```
+"$(pwd)"/reproducible-macports/reproducible-port-list
+export PATH="$(pwd)"/reproducible-macports.conf/root/bin:"$(pwd)"/reproducible-macports.conf/root/sbin:/usr/bin:/usr/bin:/bin:/sbin
+```
+
+From now on, whenever the file `reproducible-macports.conf/PortList` changes, ports will be added or removed as necessary; if a port changes version, it will be upgraded.
 
 
 ## Caveats
