@@ -2,6 +2,14 @@
 # Copyright © 2019 The developers of reproducible-macports. See the COPYRIGHT file in the top-level directory of this distribution and at https://raw.githubusercontent.com/raphaelcohn/reproducible-macports/master/COPYRIGHT.
 
 
+reproducible_macports_checkNoIndex()
+{
+	reproducible_macports_index=true
+	if [ -n ${REPRODUCIBLE_PORT_NO_INDEX+isset} ]; then
+		reproducible_macports_index=false
+	fi
+}
+
 depends sysctl
 reproducible_macports_supportOfficiallyUnsupportedMacs()
 {
@@ -27,7 +35,10 @@ reproducible_macports_setVariables()
 	
 	reproducible_macports_defaultPath=/usr/bin:/bin:/usr/sbin:/sbin
 	
+	reproducible_macports_checkNoIndex
+	
 	reproducible_macports_supportOfficiallyUnsupportedMacs
+	
 }
 
 depends xcode-select

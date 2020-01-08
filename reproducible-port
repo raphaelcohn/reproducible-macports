@@ -160,7 +160,9 @@ reproducible_macports_main()
 	
 	reproducible_macports_install 2>"$(pwd)"/logs/reproducible-port.install.log 1>&2
 	
-	reproducible_macports_portIndex 2>"$(pwd)"/logs/reproducible-port.portindex.log 1>&2
+	if $reproducible_macports_index; then
+		reproducible_macports_portIndex 2>"$(pwd)"/logs/reproducible-port.portindex.log 1>&2
+	fi
 	
 	PATH="$reproducible_macports_prefixFolderPath"/bin:"$reproducible_macports_prefixFolderPath"/sbin:"$PATH" exec port "$@"
 }
