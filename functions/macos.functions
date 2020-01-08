@@ -5,7 +5,7 @@
 reproducible_macports_checkNoIndex()
 {
 	reproducible_macports_index=true
-	if [ -n ${REPRODUCIBLE_PORT_NO_INDEX+isset} ]; then
+	if [ -n "${REPRODUCIBLE_PORT_NO_INDEX+isset}" ]; then
 		reproducible_macports_index=false
 	fi
 }
