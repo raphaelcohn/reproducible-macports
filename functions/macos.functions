@@ -72,7 +72,7 @@ reproducible_macports_clean()
 	fi
 }
 
-depends id env make rm cat mkdir ln
+depends id env make rm cat mkdir rm ln
 reproducible_macports_compile()
 {
 	local archiveType='tbz2'
@@ -197,6 +197,7 @@ reproducible_macports_compile()
 	printf '' >"$configurationFolderPath"/variants.conf
 	
 	mkdir -m 0700 -p "$reproducible_macports_prefixFolderPath"/var/macports
+	rm -rf "$reproducible_macports_prefixFolderPath"/var/macports/distfiles
 	ln -s ../../../reproducible-macports.conf/distfiles "$reproducible_macports_prefixFolderPath"/var/macports/distfiles
 	
 	printf '%s\n' "$reproducible_macports_currentMacportsVersion" >"$reproducible_macports_installedMacportsVersionFile"
