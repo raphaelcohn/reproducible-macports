@@ -36,7 +36,17 @@ A cache of downloaded distfiles (downloaded archives for versions) can be found 
 
 ### Getting out of a mess
 
-If you get into a mess, just delete `reproducible-macports/prefix`, eg `rm -rf reproducible-macports/prefix`.
+If you get into a mess, just delete `reproducible-macports/prefix`, eg `rm -rf reproducible-macports/prefix`
+
+
+### Sharing built binaries with others
+
+reproducible-port always builds from source; for some ports, this can take a very long time indeed. It is possible to share built ports without setting up a webserver. If all of your colleagues are using recent (ie not unsupported) Macs, and have checked out the parent repository (eg `my-git-repository` ) containing `reproducible-macports` and `reproducible-macports.conf` to ***exactly*** the same location (eg `/Users/must-be-the-same/Documents/my-git-repository`), then edit `reproducible-macports.conf/software/.gitignore` and remove the line `/*/*.tbz2`. The built ports in `reproducible-macports.conf/software` can then be checked into git and will be used by other checkouts.
+
+
+### Removing unwanted distfiles for ports no longer used
+
+Delete folders in `reproducible-macports.conf/distfiles`.
 
 
 ### Adding binaries to the path as part of a build
@@ -55,11 +65,11 @@ use_reproducible_ports()
 	local reproducible_port=./reproducible-port.conf/reproducible-port
 	
 	set +e
-		"$reproducible_port" uninstall inactive 2>/dev/null
+		"$reproducible_port" -q -N uninstall inactive 2>/dev/null
 		local exitCode=1
 		while [ $exitCode -eq 1 ]
 		do
-			"$reproducible_port" uninstall --follow-dependencies --follow-dependents leaves 2>/dev/null
+			"$reproducible_port" -q -N uninstall --follow-dependencies --follow-dependents leaves 2>/dev/null
 			exitCode=$?
 		done
 	set -e
@@ -67,12 +77,12 @@ use_reproducible_ports()
 	local portName
 	for portName in "$@"
 	do
-		"$reproducible_port" clean --archive --logs --work "$portName"
-		"$reproducible_port" install --no-rev-upgrade "$portName"
+		"$reproducible_port" -q -N clean --logs --work "$portName"
+		"$reproducible_port" -q -N install --no-rev-upgrade "$portName"
 	done
 	
 	# Run in case local-ports or macports-ports have changed.
-	"$reproducible_port" upgrade outdated
+	"$reproducible_port" -q -N upgrade outdated
 	
 	export PATH="$(pwd)"/reproducible-macports.conf/root/bin:"$(pwd)"/reproducible-macports.conf/root/sbin:/usr/bin:/usr/bin:/bin:/sbin
 }
@@ -109,7 +119,12 @@ Now, as part of your build script (such as `my-git-repository/build`), add lines
 export PATH="$(pwd)"/reproducible-macports.conf/root/bin:"$(pwd)"/reproducible-macports.conf/root/sbin:/usr/bin:/usr/bin:/bin:/sbin
 ```
 
-From now on, whenever the file `reproducible-macports.conf/PortList` changes, ports will be added or removed as necessary; if a port changes version, it will be upgraded.
+From now on, whenever the file `reproducible-macports.conf/PortList` changes, ports will be added or removed as necessary; if a port changes version, it will be upgraded. Additionally, when ports are no longer in the `PortList`, their files in `reproducible-macports.conf/distfiles` and `reproducible-macports.conf/software` will be removed.
+
+
+### Changing which ports require root permissions to install
+
+A hard-coded list of ports requiring root permissions to install them is kept in `reproducible-macports.conf/ports-requiring-root-to-install`. It is only used by `reproducible-port-list` currently. By default, this file is a symlink; if you need to change it, break the symlink and copy the file's contents to `reproducible-macports.conf/ports-requiring-root-to-install` and then edit them; it consists of a line-delimited list of ports (one port per line). Comments beginning `#` and blank lines are permitted, but not whitespace.
 
 
 ## Caveats

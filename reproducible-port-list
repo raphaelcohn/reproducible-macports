@@ -126,64 +126,110 @@ depends()
 	done
 }
 
+depends dirname mkdir
+reproducible_port_list_createMissingPortList()
+{
+	local filePath="$1"
+	
+	local parentFolderPath="$(dirname "$filePath")"
+	mkdir -m 0700 -p "$parentFolderPath"
+	
+	if [ ! -e "$filePath" ]; then
+		printf '' >"$filePath"
+	fi
+}
+
+depends sed
+reproducible_port_list_simplifyPortList()
+{
+	local originalPortListFilePath="$1"
+	local simplifiedPortListFilePath="$2"
+	
+	# NOTE: macos sed adds a trailing line, so `read -r` will work even if the final line does not end with a line feed.
+	sed -e 's/[[:space:]]+/ /g' -e 's/^ //g' -e 's/ $//g' -e '/^$/d' -e '/^#/d' "$originalPortListFilePath" >"$simplifiedPortListFilePath"
+}
+
 reproducible_port_list_uninstallLeaves()
 {
 	set +e
-		./reproducible-port uninstall --follow-dependencies --follow-dependents inactive 2>/dev/null
+		./reproducible-port -q -N uninstall --follow-dependencies --follow-dependents inactive 2>/dev/null
 		
 		local exitCode=1
 		while [ $exitCode -eq 0 ]
 		do
-			./reproducible-port uninstall --follow-dependencies --follow-dependents leaves 2>/dev/null
+			./reproducible-port -q -N uninstall --follow-dependencies --follow-dependents leaves 2>/dev/null
 			exitCode=$?
 		done
 	set -e
 }
 
-depends diff tail cat rm cp
+depends diff cp tail id
 reproducible_port_list_update()
 {
 	local userPortsListFilePath="$(pwd)"/reproducible-macports.conf/PortList
-	local cachedPortsListFilePath="$reproducible_macports_prefixFolderPath"/.PortList
+	reproducible_port_list_createMissingPortList "$userPortsListFilePath"
 	
-	if [ -f "$userPortsListFilePath" ]; then
-		if [ -r "$userPortsListFilePath" ]; then
-			if [ -f "$cachedPortsListFilePath" ]; then
-				if [ -r "$cachedPortsListFilePath" ]; then
-					if diff -q "$userPortsListFilePath" "$cachedPortsListFilePath" 1>/dev/null; then
-						return 0
-					fi
-				fi
+	local cachedPortsListFilePath="$reproducible_macports_prefixFolderPath"/.PortList
+	reproducible_port_list_createMissingPortList "$cachedPortsListFilePath"
+
+	if diff -q "$userPortsListFilePath" "$cachedPortsListFilePath" 1>/dev/null; then
+		return 0
+	fi
+	
+	local userSimplified="$reproducible_macports_logsFolderPath"/user
+	reproducible_port_list_simplifyPortList "$userPortsListFilePath" "$userSimplified"
+	
+	local cachedSimplified="$reproducible_macports_logsFolderPath"/cached
+	reproducible_port_list_simplifyPortList "$cachedPortsListFilePath" "$cachedSimplified"
+	
+	if diff -q "$userSimplified" "$cachedSimplified" 1>/dev/null; then
+		cp -f "$userPortsListFilePath" "$cachedPortsListFilePath"
+		return 0
+	fi
+	
+	local portName
+	local variants
+	
+	./reproducible-port index
+	export REPRODUCIBLE_PORT_NO_INDEX=true
+	
+	tail -r "$cachedSimplified" >"$cachedSimplified".reversed
+	while IFS=' ' read -r portName variants
+	do
+		./reproducible-port -q -N uninstall --follow-dependencies --follow-dependents "$portName"
+		if ! grep -q '^'"$portName $variants"'$' "$userSimplified"; then
+			./reproducible-port -q -N clean --all "$portName"
+		fi
+	done <"$cachedSimplified".reversed
+	
+	local currentUserId="$(id -u)"
+	
+	_contain_IFS_change()
+	{
+		local IFS=' '
+		set -- ./reproducible-port -q -N install "$portName" $variants
+		
+		if grep -q "^${portName}$" "$(pwd)"/reproducible-macports.conf/ports-requiring-root-to-install; then
+			if [ $currentUserId -ne 0 ]; then
+				set -- sudo -p "Please enter the password for the user '%s' to install the port '$portName' using root permissions: " "$@"
 			fi
 		fi
-	fi
-
-	local portName
-	if [ -f "$cachedPortsListFilePath" ]; then
-		if [ -r "$cachedPortsListFilePath" ]; then
-			# NOTE: macos sed adds a trailing line, so input does not need to end with a line feed.
-			tail -r "$cachedPortsListFilePath" | tr -d '[:blank:]' | sed -e '/^#/d' -e '/^$/d' | while IFS= read -r portName
-			do
-				./reproducible-port uninstall --follow-dependencies --follow-dependents "$portName"
-				./reproducible-port clean --archive --logs --work "$portName"
-			done
-		fi
-	fi
-	rm -rf "$cachedPortsListFilePath"
+		
+		"$@"
+	}
 	
-	# NOTE: macos sed adds a trailing line, so input does not need to end with a line feed.
-	if [ -f "$userPortsListFilePath" ]; then
-		if [ -r "$userPortsListFilePath" ]; then
-			cat "$userPortsListFilePath" | tr -d '[:blank:]' | sed -e '/^#/d' -e '/^$/d' | while IFS= read -r portName
-			do
-				./reproducible-port clean --archive --logs --work "$portName"
-				./reproducible-port install "$portName"
-			done
-			cp "$userPortsListFilePath" "$cachedPortsListFilePath"
+	while IFS=' ' read -r portName variants
+	do
+		if ! grep -q '^'"$portName $variants"'$' "$cachedSimplified"; then
+			./reproducible-port -q -N clean --logs --work --archive "$portName"
 		fi
-	fi
+		_contain_IFS_change
+		./reproducible-port -q -N setrequested "$portName"
+	done <"$userSimplified"
 	
 	reproducible_port_list_uninstallLeaves
+	
+	cp "$userPortsListFilePath" "$cachedPortsListFilePath"
 }
 
 depends uname
@@ -201,6 +247,8 @@ reproducible_port_list_main()
 	. "$functions"/macos.functions
 
 	reproducible_macports_setVariables
+	
+	reproducible_macports_cleanLogsFolder
 	
 	reproducible_port_list_update
 }

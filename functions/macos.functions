@@ -29,6 +29,8 @@ reproducible_macports_setVariables()
 	reproducible_macports_sourceFolderPath="$(pwd)"/source/macports-base
 	reproducible_macports_prefixFolderPath="$(pwd)"/prefix
 	
+	reproducible_macports_logsFolderPath="$(pwd)"/logs
+	
 	reproducible_macports_currentMacportsVersion="$(git -C "$reproducible_macports_sourceFolderPath" log --pretty=format:%H -n 1)"
 	
 	reproducible_macports_installedMacportsVersionFile="$reproducible_macports_prefixFolderPath"/.macports.version
@@ -39,6 +41,14 @@ reproducible_macports_setVariables()
 	
 	reproducible_macports_supportOfficiallyUnsupportedMacs
 	
+}
+
+depends rm
+reproducible_macports_cleanLogsFolder()
+{
+	set +e
+		rm -rf "$reproducible_macports_logsFolderPath"/*
+	set -e
 }
 
 depends xcode-select

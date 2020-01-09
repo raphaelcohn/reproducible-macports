@@ -158,10 +158,24 @@ reproducible_macports_main()
 
 	reproducible_macports_setVariables
 	
-	reproducible_macports_install 2>"$(pwd)"/logs/reproducible-port.install.log 1>&2
+	reproducible_macports_cleanLogsFolder
+	
+	reproducible_macports_install 2>"$reproducible_macports_logsFolderPath"/reproducible-port.install.log 1>&2
+	
+	local index_only=false
+	if [ $# -eq 1 ]; then
+		if [ "$1" = 'index' ]; then
+			reproducible_macports_index=true
+			index_only=true
+		fi
+	fi
 	
 	if $reproducible_macports_index; then
-		reproducible_macports_portIndex 2>"$(pwd)"/logs/reproducible-port.portindex.log 1>&2
+		reproducible_macports_portIndex 2>"$reproducible_macports_logsFolderPath"/reproducible-port.portindex.log 1>&2
+	fi
+	
+	if $index_only; then
+		return 0
 	fi
 	
 	PATH="$reproducible_macports_prefixFolderPath"/bin:"$reproducible_macports_prefixFolderPath"/sbin:"$PATH" exec port "$@"

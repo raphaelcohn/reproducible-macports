@@ -184,10 +184,21 @@ install_reproducible_macports()
 			printf '' >distfiles/.gitignore
 			git add distfiles/.gitignore
 		fi
+
+		if [ ! -e software/.gitignore ]; then
+			mkdir -m 0700 -p software
+			printf '/*/*.tbz2\n' >software/.gitignore
+			git add software/.gitignore
+		fi
 		
 		if [ ! -e PortList ]; then
 			printf '\n' >PortList
 			git add PortList
+		fi
+		
+		if [ ! -e ports-requiring-root-to-install ]; then
+			ln -s ../"$ourFolderName"/source/ports-requiring-root-to-install ports-requiring-root-to-install
+			git add ports-requiring-root-to-install
 		fi
 		
 	environment_cdBack
