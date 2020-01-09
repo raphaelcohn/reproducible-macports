@@ -122,9 +122,9 @@ export PATH="$(pwd)"/reproducible-macports.conf/root/bin:"$(pwd)"/reproducible-m
 From now on, whenever the file `reproducible-macports.conf/PortList` changes, ports will be added or removed as necessary; if a port changes version, it will be upgraded. Additionally, when ports are no longer in the `PortList`, their files in `reproducible-macports.conf/distfiles` and `reproducible-macports.conf/software` will be removed.
 
 
-### Changing which ports require root permissions to install
+### Changing which ports require root permissions
 
-A hard-coded list of ports requiring root permissions to install them is kept in `reproducible-macports.conf/ports-requiring-root-to-install`. It is only used by `reproducible-port-list` currently. By default, this file is a symlink; if you need to change it, break the symlink and copy the file's contents to `reproducible-macports.conf/ports-requiring-root-to-install` and then edit them; it consists of a line-delimited list of ports (one port per line). Comments beginning `#` and blank lines are permitted, but not whitespace.
+A hard-coded list of ports requiring root permissions to install or clean them is kept in `reproducible-macports.conf/ports-requiring-root`. It is only used by `reproducible-port-list` currently. By default, this file is a symlink; if you need to change it, break the symlink and copy the file's contents to `reproducible-macports.conf/ports-requiring-root` and then edit them; it consists of a line-delimited list of ports (one port per line). Comments beginning `#` and blank lines are permitted, but not whitespace.
 
 
 ## Caveats
@@ -135,6 +135,7 @@ The software can support officially unsupported Macs running Mojave and Catalina
 
 If a local port file is invalid, indexing does not fail but `reproducible-port` will produce a cryptic error on install such as `reproducible-macports/reproducible-port install bad_port` for `Error: Port bad_port not found`. Sadly, this also can occur is `bad_port` exists but `REPRODUCIBLE_PORT_NO_INDEX` has become set and it has never been indexed.
 
+Ports required root is *NOT* consulted if a port is being installed as a dependency.
 
 ## License
 

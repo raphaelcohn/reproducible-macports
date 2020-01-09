@@ -193,38 +193,58 @@ reproducible_port_list_update()
 	./reproducible-port index
 	export REPRODUCIBLE_PORT_NO_INDEX=true
 	
+	local isNotRunningAsRoot=true
+	if [ "$(id -u)" -eq 0 ]; then
+		isNotRunningAsRoot=false
+	fi
+	_port_requires_root()
+	{
+		if grep -q "^${portName}$" "$(pwd)"/reproducible-macports.conf/ports-requiring-root; then
+			if $isNotRunningAsRoot; then
+				return 0
+			fi
+		fi
+		return 1
+	}
+	
 	tail -r "$cachedSimplified" >"$cachedSimplified".reversed
 	while IFS=' ' read -r portName variants
 	do
-		./reproducible-port -q -N uninstall --follow-dependencies --follow-dependents "$portName"
-		if ! grep -q '^'"$portName $variants"'$' "$userSimplified"; then
-			./reproducible-port -q -N clean --all "$portName"
+		set -- ./reproducible-port -q -N
+		if _port_requires_root "$portName"; then
+			set -- sudo -p "Please enter the password for the user '%s' to modify the port '$portName' using root permissions: " "$@"
 		fi
+		
+		"$@" uninstall --follow-dependencies --follow-dependents "$portName"
+		
+		if ! grep -q '^'"$portName $variants"'$' "$userSimplified"; then
+			"$@" clean --all "$portName"
+		fi
+		
 	done <"$cachedSimplified".reversed
 	
-	local currentUserId="$(id -u)"
 	
-	_contain_IFS_change()
+	_install_but_allow_IFS_to_be_different_to_expand_variants()
 	{
 		local IFS=' '
-		set -- ./reproducible-port -q -N install "$portName" $variants
-		
-		if grep -q "^${portName}$" "$(pwd)"/reproducible-macports.conf/ports-requiring-root-to-install; then
-			if [ $currentUserId -ne 0 ]; then
-				set -- sudo -p "Please enter the password for the user '%s' to install the port '$portName' using root permissions: " "$@"
-			fi
-		fi
-		
-		"$@"
+		"$@" install "$portName" $variants
 	}
 	
 	while IFS=' ' read -r portName variants
 	do
-		if ! grep -q '^'"$portName $variants"'$' "$cachedSimplified"; then
-			./reproducible-port -q -N clean --logs --work --archive "$portName"
+		set -- ./reproducible-port -q -N
+		if _port_requires_root "$portName"; then
+			set -- sudo -p "Please enter the password for the user '%s' to modify the port '$portName' using root permissions: " "$@"
 		fi
-		_contain_IFS_change
-		./reproducible-port -q -N setrequested "$portName"
+		
+		if ! grep -q '^'"$portName $variants"'$' "$cachedSimplified"; then
+			"$@" clean --logs --work --archive "$portName"
+		fi
+		
+		_install_but_allow_IFS_to_be_different_to_expand_variants "$@"
+		
+		$@"" setrequested "$portName"
+		
 	done <"$userSimplified"
 	
 	reproducible_port_list_uninstallLeaves
