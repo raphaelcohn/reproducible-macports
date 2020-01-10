@@ -117,16 +117,13 @@ reproducible_macports_compile()
 	environment_gitClean "$reproducible_macports_sourceFolderPath"
 	
 	cat >"$configurationFolderPath"/archive_sites.conf <<-EOF
-		name macports_archives
-		
-		name Empty
-		urls 
+		urls file://$(pwd)/reproducible-macports.conf/software
 		type ${archiveType}
 		prefix ${reproducible_macports_prefixFolderPath}
 		applications_dir ${applicationsFolderPath}
 		frameworks_dir ${frameworksFolderPath}
 		cxx_stdlib libc++
-		delete_la_files yes
+		delete_la_files no
 	EOF
 	
 	cat >"$configurationFolderPath"/macports.conf <<-EOF
@@ -140,7 +137,7 @@ reproducible_macports_compile()
 		frameworks_dir ${frameworksFolderPath}
 		sources_conf ${configurationFolderPath}/sources.conf
 		variants_conf ${configurationFolderPath}/variants.conf
-		buildfromsource always
+		buildfromsource ifneeded
 		portarchivetype ${archiveType}
 		hfscompression yes
 		build_arch x86_64
