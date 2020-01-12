@@ -117,6 +117,7 @@ reproducible_macports_compile()
 	environment_gitClean "$reproducible_macports_sourceFolderPath"
 	
 	cat >"$configurationFolderPath"/archive_sites.conf <<-EOF
+		name macports_archives
 		urls file://$(pwd)/reproducible-macports.conf/software
 		type ${archiveType}
 		prefix ${reproducible_macports_prefixFolderPath}
