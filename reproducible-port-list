@@ -149,21 +149,198 @@ reproducible_port_list_simplifyPortList()
 	sed -e 's/[[:space:]]+/ /g' -e 's/^ //g' -e 's/ $//g' -e '/^$/d' -e '/^#/d' "$originalPortListFilePath" >"$simplifiedPortListFilePath"
 }
 
-reproducible_port_list_uninstallLeaves()
+depends tail sed awk
+reproducible_port_list_installed()
+{
+	installedVersionRevision="$reproducible_macports_logsFolderPath"/installed-version-revision
+	./reproducible-port installed | tail -n +2 | sed -e 's/^  //g' -e 's/ @/ /g' | awk '$3="(active)" {split($2,a,"+"); split(a[1],b,"_"); print $1,b[1],b[2]}' >"$installedVersionRevision"
+	
+	installed="$reproducible_macports_logsFolderPath"/installed	
+	awk '{print $1}' "$installedVersionRevision" >"$installed"
+}
+
+depends rm
+reproducible_port_list_removeBuildsAndLogsAndIncoming()
+{
+	set +f
+		rm -rf "$reproducible_macports_prefixFolderPath"/var/macports/build/*
+		rm -rf "$reproducible_macports_prefixFolderPath"/var/macports/log/*
+		rm -rf "$reproducible_macports_prefixFolderPath"/var/macports/incoming
+	set -f
+}
+
+depends rm openssl
+reproducible_port_list_signExistingArchives()
+{
+	local archiveFile
+	local archiveFileSignature
+	set +f
+	for archiveFile in "$(pwd)"/reproducible-macports.conf/software/*/*.tbz2
+	do
+		set -f
+		if [ ! -e "$archiveFile" ]; then
+			continue
+		fi
+		local archiveFileSignature="$archiveFile".rmd160
+		rm -rf "$archiveFileSignature"
+		openssl dgst -ripemd160 -sign "$(pwd)"/source/local-package-signing-key/local-package-signing-key.private.pem -out "$archiveFileSignature" "$archiveFile"
+	done
+	set +f
+}
+
+depends mkdir ln basename
+reproducible_port_list_trustExistingArchives()
+{
+	local verified="$reproducible_macports_prefixFolderPath"/var/macports/incoming/verified
+	
+	mkdir -m 0700 -p "$reproducible_macports_prefixFolderPath"/var/macports/incoming/verified
+	local file
+	set +f
+	for file in "$(pwd)"/reproducible-macports.conf/software/*/*.tbz2
+	do
+		ln -s "$file" "$verified"/"$(basename "$file")"
+	done
+}
+
+reproducible_port_list_uninstallInactivePorts()
 {
 	set +e
 		./reproducible-port -q -N uninstall --follow-dependencies --follow-dependents inactive 2>/dev/null
-		
-		local exitCode=1
-		while [ $exitCode -eq 0 ]
-		do
-			./reproducible-port -q -N uninstall --follow-dependencies --follow-dependents leaves 2>/dev/null
-			exitCode=$?
-		done
 	set -e
 }
 
-depends diff cp tail id
+reproducible_port_list_uninstallAndCleanAllPorts()
+{
+	while IFS=' ' read -r portName
+	do
+		set -- ./reproducible-port
+		if _port_requires_root "$portName"; then
+			set -- sudo -p "Please enter the password for the user '%s' to modify the port '$portName' using root permissions: " "$@"
+		fi
+	
+		"$@" uninstall --follow-dependencies --follow-dependents "$portName"
+	done <"$installed"
+}
+
+depends sudo
+reproducible_port_list_installNewPortList()
+{
+	_install_but_allow_IFS_to_be_different_to_expand_variants()
+	{
+		local IFS=' '
+		"$@" install "$portName" $variants
+	}
+
+	while IFS=' ' read -r portName variants
+	do
+		set -- ./reproducible-port -q -N
+		if _port_requires_root "$portName"; then
+			set -- sudo -p "Please enter the password for the user '%s' to modify the port '$portName' using root permissions: " "$@"
+		fi
+	
+		_install_but_allow_IFS_to_be_different_to_expand_variants "$@"
+		"$@" clean --archive "$portName"
+	done <"$userSimplified"
+}
+
+depends grep rm
+reproducible_port_list_removeUnusedDistfilesAndSoftware()
+{
+	local installedVersionRevision
+	local installed
+	reproducible_port_list_installed
+	
+	_reproducible_port_list_removeUnusedDistfilesAndSoftware_forFolderName()
+	{
+		local portName
+		cd "$(pwd)"/reproducible-macports.conf/distfiles 1>/dev/null 2>/dev/null
+	
+			set +f
+				for portName in "$(pwd)"/reproducible-macports.conf/"$folderName"/*
+				do
+					set -f
+		
+					if [ ! -e "$portName" ]; then
+						continue
+					fi
+		
+					case "$portName" in
+						.*)
+							continue
+						;;
+					esac
+		
+					if ! grep -q '^'"$portName"'$' "$installed"; then
+						rm -rf "$portName"
+						continue
+					fi
+		
+				done
+			set -f
+		
+		cd - 1>/dev/null 2>/dev/null
+	}
+	
+	_reproducible_port_list_removeUnusedDistfilesAndSoftware_removeInactiveDistfiles()
+	{
+		local portName
+		local version
+		local revision
+		while IFS=' ' read -r portName version revision
+		do
+			ls -1 "$(pwd)"/reproducible-macports.conf/distfiles | while IFS='' read -r file
+			do
+				case "$file" in
+
+					*"$version"*)
+						:
+					;;
+				
+					*)
+						rm -rf "$file"
+					;;
+					
+				esac
+			done
+		done <"$installedVersionRevision"
+	}
+	
+	_reproducible_port_list_removeUnusedDistfilesAndSoftware_removeInactiveSoftware()
+	{
+		local portName
+		local version
+		local revision
+		while IFS=' ' read -r portName version revision
+		do
+			ls -1 "$(pwd)"/reproducible-macports.conf/software | while IFS='' read -r file
+			do
+				case "$file" in
+
+					"$portName"-"$version"_"$revision".*.tbz2)
+						:
+					;;
+				
+					*)
+						rm -rf "$file"
+					;;
+					
+				esac
+			done
+		done <"$installedVersionRevision"
+	}
+	
+	local folderName
+	for folderName in distfiles software
+	do
+		_reproducible_port_list_removeUnusedDistfilesAndSoftware_forFolderName
+	done
+	
+	_reproducible_port_list_removeUnusedDistfilesAndSoftware_removeInactiveDistfiles
+	
+	_reproducible_port_list_removeUnusedDistfilesAndSoftware_removeInactiveSoftware	
+}
+
+depends diff cp id grep
 reproducible_port_list_update()
 {
 	local userPortsListFilePath="$(pwd)"/reproducible-macports.conf/PortList
@@ -193,6 +370,14 @@ reproducible_port_list_update()
 	./reproducible-port index
 	export REPRODUCIBLE_PORT_NO_INDEX=true
 	
+	reproducible_port_list_removeBuildsAndLogsAndIncoming
+	
+	reproducible_port_list_uninstallInactivePorts
+
+	local installedVersionRevision
+	local installed
+	reproducible_port_list_installed
+	
 	local isNotRunningAsRoot=true
 	if [ "$(id -u)" -eq 0 ]; then
 		isNotRunningAsRoot=false
@@ -207,47 +392,18 @@ reproducible_port_list_update()
 		return 1
 	}
 	
-	tail -r "$cachedSimplified" >"$cachedSimplified".reversed
-	while IFS=' ' read -r portName variants
-	do
-		set -- ./reproducible-port -q -N
-		if _port_requires_root "$portName"; then
-			set -- sudo -p "Please enter the password for the user '%s' to modify the port '$portName' using root permissions: " "$@"
-		fi
-		
-		"$@" uninstall --follow-dependencies --follow-dependents "$portName"
-		
-		if ! grep -q '^'"$portName $variants"'$' "$userSimplified"; then
-			"$@" clean --all "$portName"
-		fi
-		
-	done <"$cachedSimplified".reversed
+	reproducible_port_list_uninstallAndCleanAllPorts
 	
+	reproducible_port_list_signExistingArchives
+	reproducible_port_list_trustExistingArchives
 	
-	_install_but_allow_IFS_to_be_different_to_expand_variants()
-	{
-		local IFS=' '
-		"$@" install "$portName" $variants
-	}
+	reproducible_port_list_installNewPortList
 	
-	while IFS=' ' read -r portName variants
-	do
-		set -- ./reproducible-port -q -N
-		if _port_requires_root "$portName"; then
-			set -- sudo -p "Please enter the password for the user '%s' to modify the port '$portName' using root permissions: " "$@"
-		fi
-		
-		if ! grep -q '^'"$portName $variants"'$' "$cachedSimplified"; then
-			"$@" clean --logs --work --archive "$portName"
-		fi
-		
-		_install_but_allow_IFS_to_be_different_to_expand_variants "$@"
-		
-		$@"" setrequested "$portName"
-		
-	done <"$userSimplified"
+	reproducible_port_list_removeUnusedDistfilesAndSoftware
 	
-	reproducible_port_list_uninstallLeaves
+	# TODO: Remove leaves, as these are only used for builds?
+	
+	reproducible_port_list_removeBuildsAndLogsAndIncoming
 	
 	cp "$userPortsListFilePath" "$cachedPortsListFilePath"
 }

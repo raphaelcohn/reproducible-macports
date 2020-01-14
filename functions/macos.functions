@@ -187,6 +187,15 @@ reproducible_macports_compile()
 		#pkg_post_unarchive_deletions	include share/doc share/man
 		
 		ui_interactive no
+		
+		# Overridden by environment variable MASTER_SITE_LOCAL.
+		#master_site_local X
+		
+		# Overridden by environment variable PATCH_SITE_LOCAL.
+		#patch_site_local X
+		
+		# Overridden by environment variable ARCHIVE_SITE_LOCAL.
+		#archive_site_local X
 	EOF
 	if [ -n ${MACOSX_DEPLOYMENT_TARGET+isset} ]; then
 		printf 'macosx_deployment_target %s\n' "$MACOSX_DEPLOYMENT_TARGET" >>"$configurationFolderPath"/macports.conf
@@ -199,7 +208,7 @@ reproducible_macports_compile()
 	EOF
 	
 	cat >"$configurationFolderPath"/pubkeys.conf <<-EOF
-		${reproducible_macports_prefixFolderPath}/share/macports/macports-pubkey.pem
+		"$(pwd)"/source/local-package-signing-key/local-package-signing-key.pem
 	EOF
 	
 	printf '' >"$configurationFolderPath"/variants.conf
@@ -207,6 +216,8 @@ reproducible_macports_compile()
 	mkdir -m 0700 -p "$reproducible_macports_prefixFolderPath"/var/macports
 	rm -rf "$reproducible_macports_prefixFolderPath"/var/macports/distfiles
 	ln -s ../../../reproducible-macports.conf/distfiles "$reproducible_macports_prefixFolderPath"/var/macports/distfiles
+	rm -rf "$reproducible_macports_prefixFolderPath"/var/macports/software
+	ln -s ../../../reproducible-macports.conf/software "$reproducible_macports_prefixFolderPath"/var/macports/software
 	
 	printf '%s\n' "$reproducible_macports_currentMacportsVersion" >"$reproducible_macports_installedMacportsVersionFile"
 }
